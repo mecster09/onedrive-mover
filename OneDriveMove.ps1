@@ -30,7 +30,7 @@ function Move-OneDriveItem {
         }
 
         $destinationUrl = "https://graph.microsoft.com/v1.0/me/drive/items/$DestinationFolderId"
-        Write-RequestDetails -Step "Get Destination Info" -Uri $destinationUrl -Headers $headers
+        ##Write-RequestDetails -Step "Get Destination Info" -Uri $destinationUrl -Headers $headers
         $destinationInfo = Invoke-RestMethod -Uri $destinationUrl -Headers $headers
         $destinationDriveId = $destinationInfo.parentReference.driveId
 
@@ -45,12 +45,10 @@ function Move-OneDriveItem {
             name = $ItemName
         } | ConvertTo-Json -Depth 10
 
-        Write-RequestDetails -Step "Move Item" -Method "PATCH" -Uri $patchUrl -Headers $headers -Body $patchBody
-
         if (-not (Test-AccessToken -AccessToken $accessToken)) {
             throw "Access token has expired during operation"
         }
-
+        Write-Host "Attempting to move '$ItemName' @ '$patchUrl'" -ForegroundColor Green
         $response = Invoke-RestMethod -Method Patch -Uri $patchUrl -Headers $headers -Body $patchBody
         Write-Host "[Success] Moved file '$ItemName' to destination" -ForegroundColor Green
         return $response
@@ -81,73 +79,6 @@ function Test-ItemExists {
     return $null -ne ($destinationItems.value | Where-Object { $_.name -eq $ItemName })
 }
 
-# Function to process folder and its contents recursively
-function Move-Folder {
-    param (
-        [string]$FolderId,
-        [string]$DestinationFolderId,
-        [string]$DestinationFolderName,
-        [string]$DestinationFolderPath,
-        [int]$Depth = 0
-    )
-
-    try {
-        # Get all items in the current folder
-        $itemsUrl = "https://graph.microsoft.com/v1.0/me/drive/items/$FolderId/children"
-        $itemsResponse = Invoke-RestMethod -Uri $itemsUrl -Headers @{Authorization = "Bearer $accessToken"}
-
-        foreach ($item in $itemsResponse.value) {
-            try {
-                if ($item.folder) {
-                    # If it's a folder, first move the folder itself
-                    Write-Host "$(' ' * $Depth)Processing folder: $($item.name)" -ForegroundColor Cyan
-                    
-                    # Check if folder exists in destination
-                    $folderExists = Test-ItemExists -ItemName $item.name -DestinationFolderId $DestinationFolderId
-                    
-                    if ($folderExists) {
-                        Write-Host "$(' ' * $Depth)Folder '$($item.name)' already exists in destination" -ForegroundColor Yellow
-                        # Get the existing folder's ID in destination
-                        $destinationUrl = "https://graph.microsoft.com/v1.0/me/drive/items/$DestinationFolderId/children"
-                        $destinationItems = Invoke-RestMethod -Uri $destinationUrl -Headers @{Authorization = "Bearer $accessToken"}
-                        $existingFolder = $destinationItems.value | Where-Object { $_.name -eq $item.name -and $_.folder }
-                        if ($existingFolder) {
-                            # Process contents of the folder recursively
-                            Move-Folder -FolderId $item.id -DestinationFolderId $existingFolder.id -Depth ($Depth + 2)
-                        }
-                    } else {
-                        # Move the folder and get its new ID
-                        $movedFolder = Move-OneDriveItem -ItemId $item.id -ItemName $item.name -DestinationFolderId $DestinationFolderId
-                        if ($movedFolder) {
-                            # Get the new folder's ID
-                            $newFolderResponse = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/me/drive/items/$($item.id)" -Headers @{Authorization = "Bearer $accessToken"}
-                            # Process contents of the folder recursively
-                            Move-Folder -FolderId $item.id -DestinationFolderId $newFolderResponse.id -Depth ($Depth + 2)
-                        }
-                    }
-                } else {
-                    # If it's a file, check if it exists and move it if it doesn't
-                    $fileExists = Test-ItemExists -ItemName $item.name -DestinationFolderId $DestinationFolderId
-                    if ($fileExists) {
-                        Write-Host "$(' ' * $Depth)File '$($item.name)' already exists in destination - skipping" -ForegroundColor Yellow
-                    } else {
-                        Write-Host "$(' ' * $Depth)Moving file: $($item.name)" -ForegroundColor White
-                        Move-OneDriveItem -ItemId $item.id -ItemName $item.name -DestinationFolderId $DestinationFolderId
-                    }
-                }
-            }
-            catch {
-                Write-Host "$(' ' * $Depth)Error processing item '$($item.name)': $($_.Exception.Message)" -ForegroundColor Red
-                continue
-            }
-        }
-    }
-    catch {
-        Write-Host "Error accessing folder contents: $($_.Exception.Message)" -ForegroundColor Red
-        Write-Host "Response: $($_.ErrorDetails.Message)" -ForegroundColor Red
-    }
-}
-
 # Update Write-RequestDetails function
 function Write-RequestDetails {
     param (
@@ -174,9 +105,9 @@ function Test-AccessToken {
     )
     
     try {
-        Write-RequestDetails -Step "Validate Token" -Uri "https://graph.microsoft.com/v1.0/me" -Headers @{
-            Authorization = "Bearer $AccessToken"
-        }
+        ##Write-RequestDetails -Step "Validate Token" -Uri "https://graph.microsoft.com/v1.0/me" -Headers @{
+        ##    Authorization = "Bearer $AccessToken"
+        ##}
         
         $response = Invoke-RestMethod -Uri "https://graph.microsoft.com/v1.0/me" -Headers @{
             Authorization = "Bearer $AccessToken"
