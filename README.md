@@ -79,6 +79,7 @@ The script includes basic error handling:
 - Large files may take longer to move
 - Ensure you have proper permissions for both source and destination folders
 - The script can be modified to handle duplicates differently by uncommenting the rename logic
+- Limit of 200 files per move
 
 ## Security Note
 
@@ -86,4 +87,4 @@ Never share your access token or commit it to version control. Consider storing 
 
 ## License
 
-This script is provided "as is" without warranty of any kind, either expressed or implied. 
+This script is provided "as is" without warranty of any kind, either expressed or implied.  
